@@ -44,7 +44,6 @@ public class Camera2Renderer extends CameraGLRendererBase {
         super.doStart();
     }
 
-
     @Override
     protected void doStop() {
         Log.d(LOGTAG, "doStop");
