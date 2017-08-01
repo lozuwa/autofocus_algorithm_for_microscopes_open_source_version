@@ -28,6 +28,8 @@ import android.view.SurfaceView;
 import android.view.WindowManager;
 import android.widget.Toast;
 
+import java.io.UnsupportedEncodingException;
+
 public class MainActivity extends Activity implements CvCameraViewListener2, MqttCallback {
 
     /** Variables */
@@ -92,7 +94,8 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
             token.setActionCallback(new IMqttActionListener() {
                 @Override
                 public void onSuccess(IMqttToken asyncActionToken) {
-                    Log.d(TAG_M, "Connection succesful");
+                    Log.d(TAG_M, "Connection successfull");
+                    showToast("Connection succesfull");
 
                     /** Subscribe to topic if connection was succesful */
                     final String topic = "/microscope";
@@ -122,6 +125,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
                 @Override
                 public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
                     Log.d(TAG_M, "Connection failed -- " + exception.toString());
+                    showToast("Connection failed");
                 }
             });
         } catch (MqttException e) {
@@ -184,41 +188,67 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     public Integer count = 0;
 
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
+        /** Callback for camera */
         aux = inputFrame.rgba();
         mGray = inputFrame.gray();
         Imgproc.Laplacian(mGray, mGray, CvType.CV_8U, 3, 1, 0);
         mGray.convertTo(mRgba, CvType.CV_8U);
 
         count++;
-        if (count % 20 == 0){
+        if (count % 90 == 0){
             MatOfDouble mu = new MatOfDouble();
             MatOfDouble std= new MatOfDouble();
             Core.meanStdDev(mRgba, mu, std);
             double variance = Math.pow(mu.get(0,0)[0], 2);
-            Log.i(TAG, String.valueOf(std) );
+            Log.i(TAG_O, String.valueOf(variance) );
+            publish_message( String.valueOf(variance) );
         }
 
-        return aux;
+        return mRgba;
     }
 
     /** Methods for mqtt connection */
     @Override
     public void connectionLost(Throwable cause) {
-
+        showToast("Connection lost!");
     }
 
     @Override
     public void messageArrived(String topic, MqttMessage message) throws Exception {
-
     }
 
     @Override
     public void deliveryComplete(IMqttDeliveryToken token) {
-
+        Log.i(TAG_M, "Message has been sent: " + token.toString());
     }
 
+    /** Support class to handle the publishing of messages */
+    public void publish_message(String payload){
+        /** Hardware must be configured for:
+         * topic: /autofocus
+         * message: values [0,1] that determine direction based on the sensors and motor direction
+         * setRetained -> false
+         * */
+        String topic = "/autofocus";
+        byte[] encodedPayload = new byte[0];
+        try {
+            encodedPayload = payload.getBytes("UTF-8");
+            MqttMessage message = new MqttMessage(encodedPayload);
+            message.setRetained(false);
+            client.publish(topic, message);
+        } catch (UnsupportedEncodingException | MqttException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /** Support class to display information */
     public void showToast(String message){
-        Toast.makeText()
+        try {
+            Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+        }
+        catch (Exception ex){
+            Toast.makeText(MainActivity.this, "Unable to show toast: " + ex.toString(), Toast.LENGTH_SHORT).show();
+        }
     }
 
 }
