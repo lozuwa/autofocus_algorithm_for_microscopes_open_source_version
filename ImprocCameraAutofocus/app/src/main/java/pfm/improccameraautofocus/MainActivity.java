@@ -1,11 +1,19 @@
 package pfm.improccameraautofocus;
 
+/**
+ * Author: Rodrigo Loza
+ * Company: pfm Medical Bolivia
+ * Description: app designed to work as a remote controller for the click microscope and
+ * the camera app.
+ * */
+
 import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.client.mqttv3.IMqttActionListener;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.IMqttToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.opencv.android.BaseLoaderCallback;
@@ -36,6 +44,12 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     private static final String TAG_O = "Opencv::Activity";
     private static final String TAG_M = "MQTT::Activity";
 
+    public static final String TEST_BROKER = "tcp://test.mosquitto.org:1883";
+    public static final String BROKER = "tcp:192.168.3.174:1883";
+
+    public static final String AUTOFOCUS_TOPIC = "/autofocus";
+    public static final String VARIANCE_TOPIC = "/variance";
+
     /** Init camera bridge (remember opencv uses camera1 api) */
     private CameraBridgeViewBase mOpenCvCameraView;
     private boolean mIsJavaCamera = true;
@@ -45,8 +59,16 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     private Mat aux;
     private Mat mGray;
 
+    /** Variables */
+    double variance = 0.0;
+
+    /** Variables for autofocus */
+    public Boolean get_variance = false;
+    public Integer counter_autofocus = 0;
+
     /** New client for mqtt connection */
     private MqttAndroidClient client;
+    public MqttConnectOptions options;
 
     /** Load the opencv module (automatic request to playstore if not installed) */
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
@@ -87,50 +109,11 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         setContentView(R.layout.activity_main);
 
         /** Start mqtt client and connection */
-        String clientId = MqttClient.generateClientId();
-        client = new MqttAndroidClient(this.getApplicationContext(), "tcp://broker.hivemq.com:1883", clientId);
-        try {
-            IMqttToken token = client.connect();
-            token.setActionCallback(new IMqttActionListener() {
-                @Override
-                public void onSuccess(IMqttToken asyncActionToken) {
-                    Log.d(TAG_M, "Connection successfull");
-                    showToast("Connection succesfull");
-
-                    /** Subscribe to topic if connection was succesful */
-                    final String topic = "/microscope";
-                    int qos = 1;
-                    try {
-                        IMqttToken subToken = client.subscribe(topic, qos);
-                        subToken.setActionCallback(new IMqttActionListener() {
-                            @Override
-                            public void onSuccess(IMqttToken asyncActionToken) {
-                                // The message was published
-                                Log.d(TAG_M, "Subscribed to topic: " + topic);
-                            }
-
-                            @Override
-                            public void onFailure(IMqttToken asyncActionToken,
-                                                  Throwable exception) {
-                                // The subscription could not be performed, maybe the user was not
-                                // authorized to subscribe on the specified topic e.g. using wildcards
-                                Log.d(TAG_M, "Unsucessfull subscription to" + topic + " " + exception.toString());
-                            }
-                        });
-                    } catch (MqttException e) {
-                        e.printStackTrace();
-                    }
-
-                }
-                @Override
-                public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
-                    Log.d(TAG_M, "Connection failed -- " + exception.toString());
-                    showToast("Connection failed");
-                }
-            });
-        } catch (MqttException e) {
-            e.printStackTrace();
-        }
+        options = new MqttConnectOptions();
+        options.setMqttVersion( 4 );
+        options.setKeepAliveInterval( 300 );
+        options.setCleanSession( false );
+        connectMQTT();
 
         /** Open the bridge with the camera interface and configure params
          * setVisibility -> True
@@ -140,7 +123,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.camera_surface_view);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(this);
-        mOpenCvCameraView.setMaxFrameSize(640,480);
+        mOpenCvCameraView.setMaxFrameSize(320,180);
     }
 
     @Override
@@ -171,6 +154,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
             mOpenCvCameraView.disableView();
     }
 
+    /***********************************************OpenCV***********************************************************/
     public void onCameraViewStarted(int width, int height) {
         /** Constructor of the camera view, initialize tensor containers */
         mRgba = new Mat(height, width, CvType.CV_8UC4);
@@ -185,28 +169,47 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         aux.release();
     }
 
-    public Integer count = 0;
-
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
         /** Callback for camera */
+
+        /** Get input frame and convert to grayscale */
         aux = inputFrame.rgba();
         mGray = inputFrame.gray();
+        /** Apply high pass filter to obtain high frequencies */
         Imgproc.Laplacian(mGray, mGray, CvType.CV_8U, 3, 1, 0);
+        /** Convert image to 8 bit depth and one channel */
         mGray.convertTo(mRgba, CvType.CV_8U);
 
-        count++;
-        if (count % 90 == 0){
+        /**If the start autofocus sequence is activated, process the variance of the laplace filtered image
+         * The variance coefficient tells us whether the image is in focus or not.
+         * */
+        if (get_variance = true){
+            counter_autofocus++;
             MatOfDouble mu = new MatOfDouble();
             MatOfDouble std= new MatOfDouble();
             Core.meanStdDev(mRgba, mu, std);
-            double variance = Math.pow(mu.get(0,0)[0], 2);
-            Log.i(TAG_O, String.valueOf(variance) );
-            publish_message( String.valueOf(variance) );
+            variance += Math.pow(mu.get(0,0)[0], 2);
+            Log.i(TAG_O, String.valueOf(variance));
+
+            if (counter_autofocus == 30){
+                variance = variance / counter_autofocus;
+                publish_message( VARIANCE_TOPIC, String.valueOf(variance) );
+                get_variance = false;
+                counter_autofocus = 0;
+            }
         }
+
+        /*  MatOfDouble mu = new MatOfDouble();
+            MatOfDouble std= new MatOfDouble();
+            Core.meanStdDev(mRgba, mu, std);
+            variance = Math.pow(mu.get(0,0)[0], 2);
+            Log.i(TAG_O, String.valueOf(variance) );*/
 
         return mRgba;
     }
+    /**********************************************************************************************************/
 
+    /***********************************************MQTT***********************************************************/
     /** Methods for mqtt connection */
     @Override
     public void connectionLost(Throwable cause) {
@@ -215,21 +218,72 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
 
     @Override
     public void messageArrived(String topic, MqttMessage message) throws Exception {
+        String mess_payload = new String(message.getPayload());
+        /** Show in a toast the messages that arrive */
+        showToast(topic+"  --  "+mess_payload);
+        /** Actions based on the income messages */
+        if (topic.equals("/autofocus") && mess_payload.equals("get")){
+            counter_autofocus = 0;
+            get_variance = true;
+        }
     }
 
     @Override
     public void deliveryComplete(IMqttDeliveryToken token) {
         Log.i(TAG_M, "Message has been sent: " + token.toString());
     }
+    /**************************************************************************************************************/
+
+    /*****************************************SUPPORT classes*******************************************************/
+    /** Support class to connect mqtt client */
+    public void connectMQTT(){
+        String clientId = MqttClient.generateClientId();
+        client = new MqttAndroidClient(this.getApplicationContext(), TEST_BROKER, clientId);
+        try {
+            IMqttToken token = client.connect(options);
+            token.setActionCallback(new IMqttActionListener() {
+                @Override
+                public void onSuccess(IMqttToken asyncActionToken) {
+                    Log.d(TAG_M, "onSuccess");
+                    Toast.makeText(MainActivity.this, "Connection successful", Toast.LENGTH_SHORT).show();
+                    client.setCallback(MainActivity.this);
+                    final String topic = "/autofocus";
+                    int qos = 1;
+                    try {
+                        IMqttToken subToken = client.subscribe(topic, qos);
+                        subToken.setActionCallback(new IMqttActionListener() {
+                            @Override
+                            public void onSuccess(IMqttToken asyncActionToken){
+                            }
+                            @Override
+                            public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+                            }
+                        });
+                    } catch (MqttException e) {
+                        e.printStackTrace();
+                    } catch (NullPointerException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                @Override
+                public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+                    Log.d(TAG_M, "onFailure");
+                    Toast.makeText(MainActivity.this, "Connection failed", Toast.LENGTH_SHORT).show();
+                }
+            });
+        } catch (MqttException e) {
+            e.printStackTrace();
+        }
+    }
 
     /** Support class to handle the publishing of messages */
-    public void publish_message(String payload){
+    public void publish_message(String topic, String payload){
         /** Hardware must be configured for:
-         * topic: /autofocus
+         * topic: /autofocus -> saved in static final variable
          * message: values [0,1] that determine direction based on the sensors and motor direction
          * setRetained -> false
          * */
-        String topic = "/autofocus";
         byte[] encodedPayload = new byte[0];
         try {
             encodedPayload = payload.getBytes("UTF-8");
@@ -250,5 +304,6 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
             Toast.makeText(MainActivity.this, "Unable to show toast: " + ex.toString(), Toast.LENGTH_SHORT).show();
         }
     }
+    /**************************************************************************************************************/
 
 }
