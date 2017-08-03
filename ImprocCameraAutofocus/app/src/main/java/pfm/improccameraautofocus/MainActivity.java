@@ -172,6 +172,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         }
     }
 
+    @Override
     public void onDestroy() {
         super.onDestroy();
         /**Destroy camera when leaving the app*/
