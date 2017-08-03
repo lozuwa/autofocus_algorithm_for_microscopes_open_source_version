@@ -37,26 +37,30 @@ import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
 import android.view.SurfaceView;
+import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.Toast;
 
 import java.io.UnsupportedEncodingException;
 
-public class MainActivity extends Activity implements CvCameraViewListener2, MqttCallback {
+public class MainActivity extends Activity implements CvCameraViewListener2, MqttCallback, View.OnClickListener {
 
     /** Variables */
+    public Button brokerButton;
+
     /** Constants */
     private static final String TAG_O = "Opencv::Activity";
     private static final String TAG_M = "MQTT::Activity";
 
     public static final String TEST_BROKER = "tcp://test.mosquitto.org:1883";
-    public static final String BROKER = "tcp:192.168.3.174:1883";
-
-    public static final String AUTOFOCUS_TOPIC = "/autofocus";
-    public static final String VARIANCE_TOPIC = "/variance";
+    public static final String PC_BROKER = "tcp:192.168.3.174:1883";
+    public String CHOSEN_BROKER = "";
 
     /** Init camera bridge (remember opencv uses camera1 api) */
     private CameraBridgeViewBase mOpenCvCameraView;
+    public static final String AUTOFOCUS_TOPIC = "/autofocus";
+    public static final String VARIANCE_TOPIC = "/variance";
     private boolean mIsJavaCamera = true;
 
     /** Tensor containers (avoid calling them on the method onFrame, otherwise processing becomes really slow )*/
@@ -65,7 +69,8 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     private Mat mGray;
 
     /** Variables */
-    public double variance = 0.0;
+    public Double variance = 0.0;
+    public Boolean broker_bool;
 
     /** Variables for autofocus */
     public Boolean get_variance;
@@ -120,8 +125,13 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
             }
         }
 
+        /** Initialize UI elements */
+        brokerButton = (Button) findViewById(R.id.button);
+        brokerButton.setOnClickListener(this);
+
         /** Initialize variables */
         get_variance = false;
+        broker_bool = false;
 
         /** Start mqtt client and connection */
          options = new MqttConnectOptions();
@@ -138,7 +148,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.tutorial1_activity_java_surface_view);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(this);
-        mOpenCvCameraView.setMaxFrameSize(640,480);
+        mOpenCvCameraView.setMaxFrameSize(320,180);
     }
 
     @Override
@@ -239,7 +249,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         /** Show in a toast the messages that arrive */
         showToast(topic+"  --  "+mess_payload);
         /** Actions based on the income messages */
-        if (topic.equals("/autofocus") && mess_payload.equals("get")){
+        if (topic.equals(AUTOFOCUS_TOPIC) && mess_payload.equals("get")){
             counter_autofocus = 0;
             get_variance = true;
         }
@@ -320,6 +330,21 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         catch (Exception ex){
             Toast.makeText(MainActivity.this, "Unable to show toast: " + ex.toString(), Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /** UI elements' events */
+    @Override
+    public void onClick(View v) {
+        broker_bool = !broker_bool;
+        if (broker_bool) {
+            CHOSEN_BROKER = PC_BROKER;
+            showToast("Connecting to: " + CHOSEN_BROKER);
+        }
+        else {
+            CHOSEN_BROKER = TEST_BROKER;
+            showToast("Connecting to: " + CHOSEN_BROKER);
+        }
+        connectMQTT();
     }
     /**************************************************************************************************************/
 
