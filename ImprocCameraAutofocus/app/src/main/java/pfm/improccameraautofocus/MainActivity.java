@@ -28,9 +28,13 @@ import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
 import org.opencv.core.MatOfDouble;
 import org.opencv.imgproc.Imgproc;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.support.v4.app.ActivityCompat;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.WindowManager;
@@ -41,6 +45,7 @@ import java.io.UnsupportedEncodingException;
 public class MainActivity extends Activity implements CvCameraViewListener2, MqttCallback {
 
     /** Variables */
+    /** Constants */
     private static final String TAG_O = "Opencv::Activity";
     private static final String TAG_M = "MQTT::Activity";
 
@@ -60,10 +65,10 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     private Mat mGray;
 
     /** Variables */
-    double variance = 0.0;
+    public double variance = 0.0;
 
     /** Variables for autofocus */
-    public Boolean get_variance = false;
+    public Boolean get_variance;
     public Integer counter_autofocus = 0;
 
     /** New client for mqtt connection */
@@ -108,22 +113,32 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         /** Set content to the xml activity_main */
         setContentView(R.layout.activity_main);
 
+        /** Permissions */
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, 1);
+            }
+        }
+
+        /** Initialize variables */
+        get_variance = false;
+
         /** Start mqtt client and connection */
-        options = new MqttConnectOptions();
-        options.setMqttVersion( 4 );
-        options.setKeepAliveInterval( 300 );
-        options.setCleanSession( false );
-        connectMQTT();
+         options = new MqttConnectOptions();
+         options.setMqttVersion( 4 );
+         options.setKeepAliveInterval( 300 );
+         options.setCleanSession( false );
+         connectMQTT();
 
         /** Open the bridge with the camera interface and configure params
          * setVisibility -> True
          * callback for onFrame
          * setMaxFrameSize -> (640,480) Image processing is heavy to compute. So the smaller image, the better.
          * */
-        mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.camera_surface_view);
+        mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.tutorial1_activity_java_surface_view);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(this);
-        mOpenCvCameraView.setMaxFrameSize(320,180);
+        mOpenCvCameraView.setMaxFrameSize(640,480);
     }
 
     @Override
@@ -169,8 +184,8 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         aux.release();
     }
 
+    /** Callback for camera */
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
-        /** Callback for camera */
 
         /** Get input frame and convert to grayscale */
         aux = inputFrame.rgba();
@@ -183,13 +198,15 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         /**If the start autofocus sequence is activated, process the variance of the laplace filtered image
          * The variance coefficient tells us whether the image is in focus or not.
          * */
-        if (get_variance = true){
+        if (get_variance){
+
+            /** Autofocus steps */
             counter_autofocus++;
             MatOfDouble mu = new MatOfDouble();
             MatOfDouble std= new MatOfDouble();
             Core.meanStdDev(mRgba, mu, std);
             variance += Math.pow(mu.get(0,0)[0], 2);
-            Log.i(TAG_O, String.valueOf(variance));
+            //Log.i(TAG_O, String.valueOf(variance));
 
             if (counter_autofocus == 30){
                 variance = variance / counter_autofocus;
@@ -205,7 +222,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
             variance = Math.pow(mu.get(0,0)[0], 2);
             Log.i(TAG_O, String.valueOf(variance) );*/
 
-        return mRgba;
+        return aux;
     }
     /**********************************************************************************************************/
 
@@ -247,7 +264,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
                     Log.d(TAG_M, "onSuccess");
                     Toast.makeText(MainActivity.this, "Connection successful", Toast.LENGTH_SHORT).show();
                     client.setCallback(MainActivity.this);
-                    final String topic = "/autofocus";
+                    final String topic = AUTOFOCUS_TOPIC;
                     int qos = 1;
                     try {
                         IMqttToken subToken = client.subscribe(topic, qos);
