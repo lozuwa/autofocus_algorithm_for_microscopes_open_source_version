@@ -32,6 +32,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
@@ -40,6 +41,7 @@ import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.CalendarView;
 import android.widget.Toast;
 
 import java.io.UnsupportedEncodingException;
@@ -54,14 +56,13 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     private static final String TAG_M = "MQTT::Activity";
 
     public static final String TEST_BROKER = "tcp://test.mosquitto.org:1883";
-    public static final String PC_BROKER = "tcp:192.168.3.174:1883";
-    public String CHOSEN_BROKER = "";
+    public static final String PC_BROKER = "tcp://192.168.3.174:1883";
+    public String CHOSEN_BROKER = PC_BROKER;
 
     /** Init camera bridge (remember opencv uses camera1 api) */
     private CameraBridgeViewBase mOpenCvCameraView;
     public static final String AUTOFOCUS_TOPIC = "/autofocus";
     public static final String VARIANCE_TOPIC = "/variance";
-    private boolean mIsJavaCamera = true;
 
     /** Tensor containers (avoid calling them on the method onFrame, otherwise processing becomes really slow )*/
     private Mat mRgba;
@@ -112,7 +113,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         Log.i(TAG_O, "called onCreate");
 
         /** Fix orientation to portrait and keep screen on */
-        setRequestedOrientation (ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        setRequestedOrientation (ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         /** Set content to the xml activity_main */
@@ -197,7 +198,6 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
 
     /** Callback for camera */
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
-
         /** Get input frame and convert to grayscale */
         aux = inputFrame.rgba();
         mGray = inputFrame.gray();
@@ -205,34 +205,19 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         Imgproc.Laplacian(mGray, mGray, CvType.CV_8U, 3, 1, 0);
         /** Convert image to 8 bit depth and one channel */
         mGray.convertTo(mRgba, CvType.CV_8U);
-
         /**If the start autofocus sequence is activated, process the variance of the laplace filtered image
          * The variance coefficient tells us whether the image is in focus or not.
          * */
-        if (get_variance){
-
+        //if (get_variance){
             /** Autofocus steps */
-            counter_autofocus++;
             MatOfDouble mu = new MatOfDouble();
             MatOfDouble std= new MatOfDouble();
             Core.meanStdDev(mRgba, mu, std);
-            variance += Math.pow(mu.get(0,0)[0], 2);
-            //Log.i(TAG_O, String.valueOf(variance));
-
-            if (counter_autofocus == 30){
-                variance = variance / counter_autofocus;
-                publish_message( VARIANCE_TOPIC, String.valueOf(variance) );
-                get_variance = false;
-                counter_autofocus = 0;
-            }
-        }
-
-        /*  MatOfDouble mu = new MatOfDouble();
-            MatOfDouble std= new MatOfDouble();
-            Core.meanStdDev(mRgba, mu, std);
             variance = Math.pow(mu.get(0,0)[0], 2);
-            Log.i(TAG_O, String.valueOf(variance) );*/
-
+            Log.i(TAG_M, "Sending message");
+            publish_message( VARIANCE_TOPIC, String.valueOf(variance) );
+            get_variance = false;
+        //}
         return aux;
     }
     /**********************************************************************************************************/
@@ -248,7 +233,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     public void messageArrived(String topic, MqttMessage message) throws Exception {
         String mess_payload = new String(message.getPayload());
         /** Show in a toast the messages that arrive */
-        showToast(topic+"  --  "+mess_payload);
+        //showToast(topic+"  --  "+mess_payload);
         /** Actions based on the income messages */
         if (topic.equals(AUTOFOCUS_TOPIC) && mess_payload.equals("get")){
             counter_autofocus = 0;
@@ -258,7 +243,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
 
     @Override
     public void deliveryComplete(IMqttDeliveryToken token) {
-        Log.i(TAG_M, "Message has been sent: " + token.toString());
+        //Log.i(TAG_M, "Message has been sent: " + token.toString());
     }
     /**************************************************************************************************************/
 
@@ -266,7 +251,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     /** Support class to connect mqtt client */
     public void connectMQTT(){
         String clientId = MqttClient.generateClientId();
-        client = new MqttAndroidClient(this.getApplicationContext(), TEST_BROKER, clientId);
+        client = new MqttAndroidClient(this.getApplicationContext(), CHOSEN_BROKER, clientId);
         try {
             IMqttToken token = client.connect(options);
             token.setActionCallback(new IMqttActionListener() {
