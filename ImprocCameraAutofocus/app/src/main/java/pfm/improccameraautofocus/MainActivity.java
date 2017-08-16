@@ -48,7 +48,7 @@ import java.io.UnsupportedEncodingException;
 
 public class MainActivity extends Activity implements CvCameraViewListener2, MqttCallback, View.OnClickListener {
 
-    /** Variables */
+    /** UI Elements */
     public Button brokerButton;
 
     /** Constants */
@@ -74,12 +74,17 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     public Boolean broker_bool;
 
     /** Variables for autofocus */
-    public Boolean get_variance;
+    public Boolean getVariance;
     public Integer counter_autofocus = 0;
 
     /** New client for mqtt connection */
     private MqttAndroidClient client;
     public MqttConnectOptions options;
+
+    /** Thread */
+    public HandlerThread mMqttKeepAlive;
+    public Handler mMqttHandler;
+    public Runnable Mqttrunnable;
 
     /** Load the opencv module (automatic request to playstore if not installed) */
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
@@ -131,7 +136,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         brokerButton.setOnClickListener(this);
 
         /** Initialize variables */
-        get_variance = false;
+        getVariance = false;
         broker_bool = false;
 
         /** Start mqtt client and connection */
@@ -149,7 +154,13 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.tutorial1_activity_java_surface_view);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(this);
-        mOpenCvCameraView.setMaxFrameSize(320,180);
+        mOpenCvCameraView.setMaxFrameSize(640,480);
+    }
+
+    /************************************Class callbacks********************************************/
+    @Override
+    public void onStart(){
+        super.onStart();
     }
 
     @Override
@@ -180,6 +191,22 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         if (mOpenCvCameraView != null)
             mOpenCvCameraView.disableView();
     }
+    /********************************************************************************************/
+
+    /*****************************Start mqtt thread*******************************************/
+    public void startMQTTThread() {
+        mMqttKeepAlive = new HandlerThread("MQTTThread");
+        mMqttKeepAlive.start();
+        mMqttHandler = new Handler(mMqttKeepAlive.getLooper());
+        Mqttrunnable = new Runnable() {
+            @Override
+            public void run() {
+                ReconnectMQTT();
+            }
+        };
+        mMqttHandler.postDelayed(Mqttrunnable, 120000);
+    }
+    /********************************************************************************************/
 
     /***********************************************OpenCV***********************************************************/
     public void onCameraViewStarted(int width, int height) {
@@ -208,7 +235,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         /**If the start autofocus sequence is activated, process the variance of the laplace filtered image
          * The variance coefficient tells us whether the image is in focus or not.
          * */
-        //if (get_variance){
+        if (getVariance){
             /** Autofocus steps */
             MatOfDouble mu = new MatOfDouble();
             MatOfDouble std= new MatOfDouble();
@@ -216,8 +243,8 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
             variance = Math.pow(mu.get(0,0)[0], 2);
             Log.i(TAG_M, "Sending message");
             publish_message( VARIANCE_TOPIC, String.valueOf(variance) );
-            get_variance = false;
-        //}
+            getVariance = false;
+        }
         return aux;
     }
     /**********************************************************************************************************/
@@ -231,13 +258,15 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
 
     @Override
     public void messageArrived(String topic, MqttMessage message) throws Exception {
-        String mess_payload = new String(message.getPayload());
+        String messPayload= new String(message.getPayload());
         /** Show in a toast the messages that arrive */
-        //showToast(topic+"  --  "+mess_payload);
+        showToast(topic+"  --  "+messPayload);
         /** Actions based on the income messages */
-        if (topic.equals(AUTOFOCUS_TOPIC) && mess_payload.equals("get")){
-            counter_autofocus = 0;
-            get_variance = true;
+        if (topic.equals(AUTOFOCUS_TOPIC) && messPayload.equals("start")){
+            getVariance = true;
+        }
+        else if (topic.equals(AUTOFOCUS_TOPIC) && messPayload.equals("stop")){
+            getVariance = false;
         }
     }
 
@@ -248,6 +277,14 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     /**************************************************************************************************************/
 
     /*****************************************SUPPORT classes*******************************************************/
+    /** Support class to mantain connection with mqtt server */
+    public void ReconnectMQTT(){
+        if (!client.isdisconnected()){
+            showToast("Attempting to reconnect to: " + CHOSEN_BROKER);
+            connectMQTT();
+        }
+    }
+
     /** Support class to connect mqtt client */
     public void connectMQTT(){
         String clientId = MqttClient.generateClientId();
@@ -258,7 +295,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
                 @Override
                 public void onSuccess(IMqttToken asyncActionToken) {
                     Log.d(TAG_M, "onSuccess");
-                    Toast.makeText(MainActivity.this, "Connection successful", Toast.LENGTH_SHORT).show();
+                    showToast("Connection successful to " + CHOSEN_BROKER);
                     client.setCallback(MainActivity.this);
                     final String topic = AUTOFOCUS_TOPIC;
                     int qos = 1;
@@ -310,6 +347,9 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
 
     /** Support class to display information */
     public void showToast(String message){
+        /** Show toast easily
+         * message: a string that contains the message
+         * */
         try {
             Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
         }

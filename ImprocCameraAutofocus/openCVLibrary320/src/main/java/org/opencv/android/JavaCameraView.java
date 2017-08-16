@@ -161,6 +161,11 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
 
                     }
 
+                    /** Set camera's fps
+                     * Supported framerates for samsung (10000,200000)
+                     * */
+                    //params.setPreviewFpsRange(10000, 15000);
+
                     mCamera.setParameters(params);
                     params = mCamera.getParameters();
 
