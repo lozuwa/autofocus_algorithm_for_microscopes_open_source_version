@@ -35,6 +35,9 @@ import android.content.pm.PackageManager;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
 import android.view.SurfaceView;
@@ -75,7 +78,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
 
     /** Variables for autofocus */
     public Boolean getVariance;
-    public Integer counter_autofocus = 0;
+    public Integer counterAutofocus = 0;
 
     /** New client for mqtt connection */
     private MqttAndroidClient client;
@@ -161,6 +164,8 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     @Override
     public void onStart(){
         super.onStart();
+        /** Start reconnection thread on start */
+        startMQTTThread();
     }
 
     @Override
@@ -182,6 +187,16 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
             Log.d(TAG_O, "OpenCV library found inside package. Using it!");
             mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
         }
+        /** Start mqtt thread again */
+        startMQTTThread();
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
+    @Override
+    public void onStop(){
+        super.onStop();
+        /** Kill the mqtt thread */
+        stopBackgroundThread();
     }
 
     @Override
@@ -205,6 +220,22 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
             }
         };
         mMqttHandler.postDelayed(Mqttrunnable, 120000);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
+    public void stopBackgroundThread(){
+        try {
+            mMqttKeepAlive.quitSafely();
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+        try{
+            mMqttKeepAlive.join();
+            mMqttKeepAlive = null;
+            mMqttHandler = null;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
     /********************************************************************************************/
 
@@ -238,12 +269,17 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         if (getVariance){
             /** Autofocus steps */
             MatOfDouble mu = new MatOfDouble();
-            MatOfDouble std= new MatOfDouble();
+            MatOfDouble std = new MatOfDouble();
             Core.meanStdDev(mRgba, mu, std);
             variance = Math.pow(mu.get(0,0)[0], 2);
             Log.i(TAG_M, "Sending message");
-            publish_message( VARIANCE_TOPIC, String.valueOf(variance) );
-            getVariance = false;
+            publish_message(VARIANCE_TOPIC, String.valueOf(variance));
+            /** Increase counter */
+            counterAutofocus++;
+            if (counterAutofocus == 2){
+                getVariance = false;
+                counterAutofocus = 0;
+            }
         }
         return aux;
     }
@@ -262,8 +298,9 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         /** Show in a toast the messages that arrive */
         showToast(topic+"  --  "+messPayload);
         /** Actions based on the income messages */
-        if (topic.equals(AUTOFOCUS_TOPIC) && messPayload.equals("start")){
+        if (topic.equals(AUTOFOCUS_TOPIC) && messPayload.equals("get")){
             getVariance = true;
+            counterAutofocus = 0;
         }
         else if (topic.equals(AUTOFOCUS_TOPIC) && messPayload.equals("stop")){
             getVariance = false;
@@ -279,7 +316,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     /*****************************************SUPPORT classes*******************************************************/
     /** Support class to mantain connection with mqtt server */
     public void ReconnectMQTT(){
-        if (!client.isdisconnected()){
+        if (!client.isConnected()){
             showToast("Attempting to reconnect to: " + CHOSEN_BROKER);
             connectMQTT();
         }

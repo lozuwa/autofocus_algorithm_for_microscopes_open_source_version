@@ -1,6 +1,6 @@
 /*
  * This file is auto-generated.  DO NOT MODIFY.
- * Original file: C:\\Users\\HP\\Dropbox\\pfm\\Apps\\Imgproc_camera_autofocus\\ImprocCameraAutofocus\\openCVLibrary320\\src\\main\\aidl\\org\\opencv\\engine\\OpenCVEngineInterface.aidl
+ * Original file: C:\\Users\\HP\\Dropbox\\pfm\\Apps\\CameraAutofocusApp\\ImprocCameraAutofocus\\openCVLibrary320\\src\\main\\aidl\\org\\opencv\\engine\\OpenCVEngineInterface.aidl
  */
 package org.opencv.engine;
 /**
