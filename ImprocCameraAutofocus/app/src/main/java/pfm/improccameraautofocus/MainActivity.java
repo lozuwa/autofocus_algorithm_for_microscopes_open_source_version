@@ -49,8 +49,9 @@ import android.widget.Toast;
 
 import java.io.UnsupportedEncodingException;
 
-public class MainActivity extends Activity implements CvCameraViewListener2, MqttCallback, View.OnClickListener {
-
+public class MainActivity extends Activity implements CvCameraViewListener2,
+                                                        MqttCallback,
+                                                        View.OnClickListener {
     /** UI Elements */
     public Button brokerButton;
 
@@ -58,8 +59,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     private static final String TAG_O = "Opencv::Activity";
     private static final String TAG_M = "MQTT::Activity";
 
-    public static final String TEST_BROKER = "tcp://test.mosquitto.org:1883";
-    public static final String PC_BROKER = "tcp://192.168.3.174:1883";
+    public static final String PC_BROKER = "tcp://192.168.0.104:1883";
     public String CHOSEN_BROKER = PC_BROKER;
 
     /** Init camera bridge (remember opencv uses camera1 api) */
@@ -73,7 +73,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     private Mat mGray;
 
     /** Variables */
-    public Double variance = 0.0;
+    public Double variance;
     public Boolean broker_bool;
 
     /** Variables for autofocus */
@@ -110,6 +110,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     /** Info */
     public MainActivity() {
         Log.i(TAG_O, "Instantiated new " + this.getClass());
+        //..
     }
 
     /** Called when the activity is first created. */
@@ -144,9 +145,9 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
 
         /** Start mqtt client and connection */
          options = new MqttConnectOptions();
-         options.setMqttVersion( 4 );
-         options.setKeepAliveInterval( 300 );
-         options.setCleanSession( false );
+         options.setMqttVersion(4);
+         options.setKeepAliveInterval(300);
+         options.setCleanSession(true);
          connectMQTT();
 
         /** Open the bridge with the camera interface and configure params
@@ -157,7 +158,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.tutorial1_activity_java_surface_view);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(this);
-        mOpenCvCameraView.setMaxFrameSize(640,480);
+        mOpenCvCameraView.setMaxFrameSize(320,180);
     }
 
     /************************************Class callbacks********************************************/
@@ -223,13 +224,13 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     }
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
-    public void stopBackgroundThread(){
+    public void stopBackgroundThread() {
         try {
             mMqttKeepAlive.quitSafely();
-        } catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
-        try{
+        try {
             mMqttKeepAlive.join();
             mMqttKeepAlive = null;
             mMqttHandler = null;
@@ -266,22 +267,22 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         /**If the start autofocus sequence is activated, process the variance of the laplace filtered image
          * The variance coefficient tells us whether the image is in focus or not.
          * */
-        if (getVariance){
+        if (getVariance) {
             /** Autofocus steps */
             MatOfDouble mu = new MatOfDouble();
             MatOfDouble std = new MatOfDouble();
             Core.meanStdDev(mRgba, mu, std);
             variance = Math.pow(mu.get(0,0)[0], 2);
-            Log.i(TAG_M, "Sending message");
-            publish_message(VARIANCE_TOPIC, String.valueOf(variance));
-            /** Increase counter */
-            counterAutofocus++;
-            if (counterAutofocus == 2){
+            if (variance < 2.0) {
+                Log.i(TAG_M, "Shit" + String.valueOf(variance));
+            }
+            else {
+                Log.i(TAG_M, String.valueOf(variance));
+                publish_message(VARIANCE_TOPIC, "message;" + String.valueOf(variance));
                 getVariance = false;
-                counterAutofocus = 0;
             }
         }
-        return aux;
+        return mRgba;
     }
     /**********************************************************************************************************/
 
@@ -290,20 +291,21 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     @Override
     public void connectionLost(Throwable cause) {
         showToast("Connection lost!");
+        //..
     }
 
     @Override
     public void messageArrived(String topic, MqttMessage message) throws Exception {
         String messPayload= new String(message.getPayload());
         /** Show in a toast the messages that arrive */
-        showToast(topic+"  --  "+messPayload);
+        //showToast(topic+"  --  "+messPayload);
         /** Actions based on the income messages */
-        if (topic.equals(AUTOFOCUS_TOPIC) && messPayload.equals("get")){
+        if (topic.equals(VARIANCE_TOPIC) && messPayload.equals("get")) {
             getVariance = true;
             counterAutofocus = 0;
         }
-        else if (topic.equals(AUTOFOCUS_TOPIC) && messPayload.equals("stop")){
-            getVariance = false;
+        else {
+
         }
     }
 
@@ -315,8 +317,8 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
 
     /*****************************************SUPPORT classes*******************************************************/
     /** Support class to mantain connection with mqtt server */
-    public void ReconnectMQTT(){
-        if (!client.isConnected()){
+    public void ReconnectMQTT() {
+        if (!client.isConnected()) {
             showToast("Attempting to reconnect to: " + CHOSEN_BROKER);
             connectMQTT();
         }
@@ -334,8 +336,8 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
                     Log.d(TAG_M, "onSuccess");
                     showToast("Connection successful to " + CHOSEN_BROKER);
                     client.setCallback(MainActivity.this);
-                    final String topic = AUTOFOCUS_TOPIC;
-                    int qos = 1;
+                    final String topic = VARIANCE_TOPIC;
+                    int qos = 2;
                     try {
                         IMqttToken subToken = client.subscribe(topic, qos);
                         subToken.setActionCallback(new IMqttActionListener() {
@@ -365,7 +367,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
     }
 
     /** Support class to handle the publishing of messages */
-    public void publish_message(String topic, String payload){
+    public void publish_message(String topic, String payload) {
         /** Hardware must be configured for:
          * topic: /autofocus -> saved in static final variable
          * message: values [0,1] that determine direction based on the sensors and motor direction
@@ -375,6 +377,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
         try {
             encodedPayload = payload.getBytes("UTF-8");
             MqttMessage message = new MqttMessage(encodedPayload);
+            message.setQos(2);
             message.setRetained(false);
             client.publish(topic, message);
         } catch (UnsupportedEncodingException | MqttException e) {
@@ -404,7 +407,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, Mqt
             showToast("Connecting to: " + CHOSEN_BROKER);
         }
         else {
-            CHOSEN_BROKER = TEST_BROKER;
+            CHOSEN_BROKER = PC_BROKER;
             showToast("Connecting to: " + CHOSEN_BROKER);
         }
         connectMQTT();
