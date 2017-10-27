@@ -1,5 +1,12 @@
 package pfm.improccameraautofocus;
 
+/**
+ * Author: Rodrigo Loza
+ * Company: pfm Medical Bolivia
+ * Description: This script is designed to work as a service requested from another app. The master is the server
+ * and should be able to call the other app when the service is completed.
+ * */
+
 import android.Manifest;
 import android.app.Activity;
 import android.content.ComponentName;
@@ -35,8 +42,6 @@ import org.opencv.imgproc.Imgproc;
 import java.io.UnsupportedEncodingException;
 
 public class AutofocusActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
-    /** UI Elements */
-    public Button readyButton;
 
     /** Constants */
     private static final String TAG_O = "Opencv::Activity";
@@ -44,12 +49,6 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
 
     /** Init camera bridge (remember opencv uses camera1 api) */
     private CameraBridgeViewBase mOpenCvCameraView;
-
-    /**
-     * MQTT Topics
-     * */
-    static public String AUTOFOCUS_APP_TOPIC = "/autofocusApp";
-    static public String CAMERA_APP_TOPIC = "/cameraApp";
 
     /** Tensor containers (avoid calling them on the method onFrame, otherwise processing becomes really slow )*/
     private Mat mRgba;
@@ -169,10 +168,17 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
         if (mOpenCvCameraView != null)
             mOpenCvCameraView.disableView();
     }
+
+    @Override
+    public void onBackPressed() {
+        /** Back operation is not allowed */
+    }
     /********************************************************************************************/
 
     /***********************************************OpenCV***********************************************************/
     public void onCameraViewStarted(int width, int height) {
+        /** Authenticate when camera has openned */
+        publishMessage(Initializer.AUTOFOCUS_APP_TOPIC, Initializer.AUTHENTICATE_AUTOFOCUS_ACTIVITY_MESSAGE);
         /** Constructor of the camera view, initialize tensor containers */
         mRgba = new Mat(height, width, CvType.CV_8UC4);
         aux = new Mat(height, width, CvType.CV_8UC4);
@@ -210,7 +216,7 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
             }
             else {
                 if (counterAutofocus == 3){
-                    publishMessage(AUTOFOCUS_APP_TOPIC, "message;" + String.valueOf(accumulate/3.0));
+                    publishMessage(Initializer.AUTOFOCUS_APP_TOPIC, "send;variance;None;None;" + String.valueOf(accumulate/3.0));
                     getVariance = false;
                 }
                 else{
@@ -239,7 +245,7 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
             /** Info */
             Log.i(TAG, "Subscribed to " + topic);
             /** Authenticate connection */
-            publishMessage(CAMERA_APP_TOPIC, "oath;autofocusApp;AutofocusActivity");
+            //publishMessage(CAMERA_APP_TOPIC, "oath;autofocusApp;AutofocusActivity");
         }
 
         @Override
@@ -258,19 +264,30 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
             //showToast(topic);
             Log.i(TAG, "New message on " + topic + ":  " + new String(payload));
             /** Incoming messages */
-            final String message = new String(payload);
-            String[] messages = message.split(";");
+            final String message_ = new String(payload);
+            String[] messages = message_.split(";");
             String command = messages[0];
-            String action = messages[1];
+            String target = messages[1];
+            String action = messages[2];
+            String specific = messages[3];
+            String message = messages[4];
+            //command;target;action;specific;message
             /** Actions based on the income messages */
-            if (command.equals("autofocusService")){
-                if (action.equals("completed")){
-                    /** Start cameraApp for manual control */
+            if (command.equals("service") && target.equals("autofocus") && action.equals("completed")){
+                if (specific.equals("ManualControllerAndCamera")){
+                    /** Start activity ManualController from cameraApp */
                     Intent intent = new Intent(Intent.ACTION_MAIN);
                     intent.setComponent(new ComponentName("com.example.android.camera2basic", "com.example.android.camera2basic.ControllerAndCamera"));
                     startActivity(intent);
+                } else if (specific.equals("CameraActivity")){
+                    /** Start activity CameraActivity from cameraApp */
+                    Intent intent = new Intent(Intent.ACTION_MAIN);
+                    intent.setComponent(new ComponentName("com.example.android.camera2basic", "com.example.android.camera2basic.CameraActivity"));
+                    startActivity(intent);
+                } else{
+                    //nothing
                 }
-            } else if (command.equals("get")) {
+            } else if (command.equals("get") && action.equals("variance")) {
                 /** Set variables to starting point */
                 getVariance = true;
                 counterAutofocus = 0;

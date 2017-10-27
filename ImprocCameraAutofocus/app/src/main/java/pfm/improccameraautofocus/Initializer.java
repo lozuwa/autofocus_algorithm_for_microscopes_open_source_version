@@ -27,9 +27,50 @@ public class Initializer extends Application {
     /**
      * MQTT Topics
      * */
-    static public String AUTOFOCUS_APP_TOPIC = "/autofocusApp";
+    static public String MICROSCOPE_TOPIC = "/microscope";
     static public String CAMERA_APP_TOPIC = "/cameraApp";
-    static public String EXTRA_ACTIONS_TOPIC = "/extra";
+    static public String AUTOFOCUS_APP_TOPIC = "/autofocusApp";
+    static public String REMOTE_CONTROLLER_TOPIC = "/remoteController";
+    static public String MACROS_TOPIC = "/macros";
+
+    /**
+     * MQTT Messages
+     * */
+    // /microscope
+    public static String MOVE_X_RIGHT_FIELD = "move;x;right;field;1";
+    public static String MOVE_X_LEFT_FIELD = "move;x;left;field;1";
+    public static String MOVE_X_RIGHT_PROCESS_START = "move;x;right;process;1";
+    public static String MOVE_X_LEFT_PROCESS_START = "move;x;left;process;1";
+    public static String MOVE_X_RIGHT_PROCESS_END = "move;x;right;process;0";
+    public static String MOVE_X_LEFT_PROCESS_END = "move;x;left;process;0";
+
+    public static String MOVE_Y_UP_FIELD = "move;y;up;field;1";
+    public static String MOVE_Y_DOWN_FIELD = "move;y;down;field;1";
+    public static String MOVE_Y_UP_PROCESS_START = "move;y;up;process;1";
+    public static String MOVE_Y_DOWN_PROCESS_START = "move;y;down;process;1";
+    public static String MOVE_Y_UP_PROCESS_END = "move;y;up;process;0";
+    public static String MOVE_Y_DOWN_PROCESS_END = "move;y;down;process;0";
+
+    public static String MOVE_Z_UP_FIELD = "move;z;up;field;1";
+    public static String MOVE_Z_DOWN_FIELD = "move;z;down;field;1";
+    public static String MOVE_Z_UP_PROCESS_START = "move;z;up;process;1";
+    public static String MOVE_Z_DOWN_PROCESS_START = "move;z;down;process;1";
+    public static String MOVE_Z_UP_PROCESS_END = "move;z;up;process;0";
+    public static String MOVE_Z_DOWN_PROCESS_END = "move;z;down;process;0";
+
+    public static String HOME_X = "home;x;None;None;None";
+    public static String HOME_Y = "home;y;None;None;None";
+    public static String HOME_Z_TOP = "home;z;top;None;None";
+    public static String HOME_Z_BOTTOM = "home;z;bottom;None;None";
+
+    /** autofocus service Manual */
+	public static String AUTHENTICATE_AUTOFOCUS_ACTIVITY_MESSAGE = "authenticate;AutofocusActivity;None;None;None";
+
+    /** Autofocus service automatic*/
+    public static String REQUEST_SERVICE_AUTOFOCUS = "requestService;autofocus;ManualController;None;None";
+
+    /**  */
+    public static String AUTOMATIC_SERVICE_START = "requestService;automatic;start;None;None";
 
     /**
      * Static variables

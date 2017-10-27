@@ -3,8 +3,9 @@ package pfm.improccameraautofocus;
 /**
  * Author: Rodrigo Loza
  * Company: pfm Medical Bolivia
- * Description: app designed to work as a remote controller for the click microscope and
- * the camera app.
+ * Description: This script is specially designed to work with the automatic's pipeline. It offers
+ * the possibility of controlling the microscope and autofocusing. The finality is to establish
+ * a good prior for the automatic pipeline.
  * */
 
 import org.opencv.android.BaseLoaderCallback;
@@ -52,19 +53,6 @@ public class CameraAndController extends Activity implements CvCameraViewListene
 
     /** Init camera bridge (remember opencv uses camera1 api) */
     private CameraBridgeViewBase mOpenCvCameraView;
-
-    /**
-     * MQTT Topics
-     * */
-    static public String AUTOFOCUS_APP_TOPIC = "/autofocusApp";
-    static public String CAMERA_APP_TOPIC = "/cameraApp";
-    static public String ZDOWN_TOPIC = "/zd";
-    static public String ZUP_TOPIC = "/zu";
-    static public String XRIGHT_TOPIC = "/xr";
-    static public String XLEFT_TOPIC = "/xl";
-    static public String YUP_TOPIC = "/yu";
-    static public String YDOWN_TOPIC = "/yd";
-    static public String EXTRA_ACTIONS_TOPIC = "/extra";
 
     /** Tensor containers (avoid calling them on the method onFrame, otherwise processing becomes really slow )*/
     private Mat mRgba;
@@ -130,7 +118,9 @@ public class CameraAndController extends Activity implements CvCameraViewListene
         readyButton = (Button) findViewById(R.id.readyButton);
         readyButton.setOnClickListener( new View.OnClickListener(){
             public void onClick(View v) {
-                publishMessage(AUTOFOCUS_APP_TOPIC, "cameraApp;start");
+                Intent intent = new Intent(Intent.ACTION_MAIN);
+                intent.setComponent(new ComponentName("com.example.android.camera2basic", "com.example.android.camera2basic.CameraActivity"));
+                startActivity(intent);
             }
         });
 
@@ -156,80 +146,66 @@ public class CameraAndController extends Activity implements CvCameraViewListene
 
         /** Capture onTouch events */
         //mOpenCvCameraView.setCvCameraViewListener(this);
-        mOpenCvCameraView.setOnTouchListener(new OnSwipeTouchListener(this) {
+        mOpenCvCameraView.setOnTouchListener(new OnSwipeTouchListener(CameraAndController.this) {
             public void onSwipeTop() {
-                Log.i(TAG_O, "Top!!!");
                 if (!blocked) {
-                    publishMessage(YUP_TOPIC, "1");
+                    publishMessage(Initializer.MICROSCOPE_TOPIC, Initializer.MOVE_Y_UP_PROCESS_START);
                     movingYUp = true;
                     blocked = true;
                 }
-                else {
-                }
             }
             public void onSwipeBottom() {
-                Log.i(TAG_O, "Bottom!!!");
                 if (!blocked) {
-                    publishMessage(YDOWN_TOPIC, "1");
+                    publishMessage(Initializer.MICROSCOPE_TOPIC, Initializer.MOVE_Y_DOWN_PROCESS_START);
                     movingYDown = true;
                     blocked = true;
                 }
-                else {
-
-                }
             }
             public void onSwipeRight() {
-                Log.i(TAG_O, "Right!!!");
                 if (!blocked) {
-                    publishMessage(XRIGHT_TOPIC, "1");
+                    publishMessage(Initializer.MICROSCOPE_TOPIC, Initializer.MOVE_X_RIGHT_PROCESS_START);
                     movingXRight = true;
                     blocked = true;
                 }
-                else{
-
-                }
             }
             public void onSwipeLeft() {
-                Log.i(TAG_O, "Left!!!");
                 if (!blocked) {
-                    publishMessage(XLEFT_TOPIC, "1");
+                    publishMessage(Initializer.MICROSCOPE_TOPIC, Initializer.MOVE_X_LEFT_PROCESS_START);
                     movingXLeft = true;
                     blocked = true;
                 }
-                else{
-
-                }
             }
             public void onClick() {
-                Log.i(TAG_O, "Click!!!");
                 if (movingYUp){
-                    publishMessage(YUP_TOPIC, "0");
+                    publishMessage(Initializer.MICROSCOPE_TOPIC, Initializer.MOVE_Y_UP_PROCESS_END);
                     movingYUp = false;
                     blocked = false;
                 }
                 else if (movingYDown) {
-                    publishMessage(YDOWN_TOPIC, "0");
+                    publishMessage(Initializer.MICROSCOPE_TOPIC, Initializer.MOVE_Y_DOWN_PROCESS_END);
                     movingYDown = false;
                     blocked = false;
                 }
                 else if (movingXRight) {
-                    publishMessage(XRIGHT_TOPIC, "0");
+                    publishMessage(Initializer.MICROSCOPE_TOPIC, Initializer.MOVE_X_RIGHT_PROCESS_END);
                     movingXRight = false;
                     blocked = false;
                 }
                 else if (movingXLeft) {
-                    publishMessage(XLEFT_TOPIC, "0");
+                    publishMessage(Initializer.MICROSCOPE_TOPIC, Initializer.MOVE_X_LEFT_PROCESS_END);
                     movingXLeft = false;
                     blocked = false;
                 }
-                else {
-                }
             }
+
             public void onDoubleClick() {
             }
+
             public void onLongClick() {
-                publishMessage(AUTOFOCUS_APP_TOPIC, "start");
+                publishMessage(Initializer.AUTOFOCUS_APP_TOPIC, Initializer.AUTHENTICATE_AUTOFOCUS_ACTIVITY_MESSAGE);
             }
+
+
         });
     }
 
@@ -323,7 +299,7 @@ public class CameraAndController extends Activity implements CvCameraViewListene
             }
             else {
                 if (counterAutofocus == 3){
-                    publishMessage(AUTOFOCUS_APP_TOPIC, "message;" + String.valueOf(accumulate/3.0));
+                    publishMessage(Initializer.AUTOFOCUS_APP_TOPIC, "send;variance;None;None;" + String.valueOf(accumulate/3.0));
                     getVariance = false;
                 }
                 else{
@@ -351,8 +327,6 @@ public class CameraAndController extends Activity implements CvCameraViewListene
         public void onSubscriptionSuccessful(Context context, String requestId, String topic) {
             /** Info */
             Log.i(TAG, "Subscribed to " + topic);
-            /** Authenticate connection */
-            publishMessage(AUTOFOCUS_APP_TOPIC, "oath;autofocusApp");
         }
 
         @Override
@@ -371,29 +345,27 @@ public class CameraAndController extends Activity implements CvCameraViewListene
             //showToast(topic + " " + new String(payload));
             Log.i(TAG, "New message on " + topic + ":  " + new String(payload));
             /** Incoming messages */
-            final String message = new String(payload);
-            String[] messages = message.split(";");
+            final String message_ = new String(payload);
+            String[] messages = message_.split(";");
             String command = messages[0];
-            String action = messages[1];
+            String target = messages[1];
+            String action = messages[2];
+            String specific = messages[3];
+            String message = messages[4];
             /** Actions based on the income messages */
-            if (command.equals("authenticate")){
-                /** Authenticate */
-                publishMessage(CAMERA_APP_TOPIC, "oath;autofocusApp");
-            } else if (command.equals("get")) {
+            if (command.equals("get") && action.equals("variance")) {
                 /** Set variables to starting point */
                 getVariance = true;
                 counterAutofocus = 0;
                 accumulate = 0.0;
-            } else if (command.equals("cameraApp")) {
-                if (action.equals("start")) {
-                    /** Feedback */
-                    showToast("Start cameraApp");
-                    /** Start app */
-                    Intent intent = new Intent(Intent.ACTION_MAIN);
-                    intent.setComponent(new ComponentName("com.example.android.camera2basic", "com.example.android.camera2basic.CameraActivity"));
-                    startActivity(intent);
-                }
-            } else{
+            } else if (command.equals("cameraApp") && target.equals("start") && action.equals("CameraActivity")) {
+                /** Feedback */
+                showToast("Start cameraApp");
+                /** Start app */
+                Intent intent = new Intent(Intent.ACTION_MAIN);
+                intent.setComponent(new ComponentName("com.example.android.camera2basic", "com.example.android.camera2basic.CameraActivity"));
+                startActivity(intent);
+            } else {
                 Log.i(TAG_M, command + ";" + action);
             }
         }
@@ -415,9 +387,7 @@ public class CameraAndController extends Activity implements CvCameraViewListene
             Log.i(TAG, "Connection statis is " + String.valueOf(connected));
         }
     };
-    /**************************************************************************************************************/
 
-    /*****************************************SUPPORT classes*******************************************************/
     /** Publish a message
      * @param topic: input String that defines the target topic of the mqtt client
      * @param message: input String that contains a message to be published
@@ -433,7 +403,9 @@ public class CameraAndController extends Activity implements CvCameraViewListene
             e.printStackTrace();
         }
     }
+    /**************************************************************************************************************/
 
+    /*****************************************SUPPORT classes*******************************************************/
     /** Support class to display information */
     public void showToast(String message){
         /** Show toast easily
