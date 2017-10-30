@@ -8,18 +8,6 @@ package pfm.improccameraautofocus;
  * a good prior for the automatic pipeline.
  * */
 
-import org.opencv.android.BaseLoaderCallback;
-import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
-import org.opencv.android.LoaderCallbackInterface;
-import org.opencv.android.OpenCVLoader;
-import org.opencv.core.Core;
-import org.opencv.core.CvType;
-import org.opencv.core.Mat;
-import org.opencv.android.CameraBridgeViewBase;
-import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
-import org.opencv.core.MatOfDouble;
-import org.opencv.imgproc.Imgproc;
-
 import android.Manifest;
 import android.app.Activity;
 import android.content.ComponentName;
@@ -40,6 +28,18 @@ import android.widget.Toast;
 
 import net.igenius.mqttservice.MQTTServiceCommand;
 import net.igenius.mqttservice.MQTTServiceReceiver;
+
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.CameraBridgeViewBase;
+import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
+import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Core;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfDouble;
+import org.opencv.imgproc.Imgproc;
 
 import java.io.UnsupportedEncodingException;
 
@@ -202,6 +202,7 @@ public class CameraAndController extends Activity implements CvCameraViewListene
             }
 
             public void onLongClick() {
+                /** Authenticate in order to trigger the service */
                 publishMessage(Initializer.AUTOFOCUS_APP_TOPIC, Initializer.AUTHENTICATE_AUTOFOCUS_ACTIVITY_MESSAGE);
             }
 
@@ -309,7 +310,7 @@ public class CameraAndController extends Activity implements CvCameraViewListene
             }
         }
         else {
-             //nothing()
+            //nothing()
         }
         return aux;
     }
@@ -342,7 +343,7 @@ public class CameraAndController extends Activity implements CvCameraViewListene
         @Override
         public void onMessageArrived(Context context, String topic, byte[] payload) {
             /** Info */
-            //showToast(topic + " " + new String(payload));
+            //showToast(topic);
             Log.i(TAG, "New message on " + topic + ":  " + new String(payload));
             /** Incoming messages */
             final String message_ = new String(payload);
@@ -353,7 +354,8 @@ public class CameraAndController extends Activity implements CvCameraViewListene
             String specific = messages[3];
             String message = messages[4];
             /** Actions based on the income messages */
-            if (command.equals("get") && action.equals("variance")) {
+            if (command.equals("get") && target.equals("variance")) {
+                Log.i(TAG, "GET AND VARIANCE");
                 /** Set variables to starting point */
                 getVariance = true;
                 counterAutofocus = 0;
@@ -366,7 +368,7 @@ public class CameraAndController extends Activity implements CvCameraViewListene
                 intent.setComponent(new ComponentName("com.example.android.camera2basic", "com.example.android.camera2basic.CameraActivity"));
                 startActivity(intent);
             } else {
-                Log.i(TAG_M, command + ";" + action);
+                Log.i(TAG_M, command + ";" + target);
             }
         }
 

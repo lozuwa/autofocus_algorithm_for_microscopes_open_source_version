@@ -15,15 +15,12 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.Bundle;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceView;
-import android.view.View;
 import android.view.WindowManager;
-import android.widget.Button;
 import android.widget.Toast;
 
 import net.igenius.mqttservice.MQTTServiceCommand;
@@ -282,16 +279,19 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
                 } else if (specific.equals("CameraActivity")){
                     /** Start activity CameraActivity from cameraApp */
                     Intent intent = new Intent(Intent.ACTION_MAIN);
-                    intent.setComponent(new ComponentName("com.example.android.camera2basic", "com.example.android.camera2basic.CameraActivity"));
+                    intent.setComponent(new ComponentName("com.example.android.camera2basic", "com.example.android.camera2basic.RecoverAutomaticService"));
                     startActivity(intent);
                 } else{
                     //nothing
                 }
-            } else if (command.equals("get") && action.equals("variance")) {
+            } else if (command.equals("get") && target.equals("variance")) {
                 /** Set variables to starting point */
                 getVariance = true;
                 counterAutofocus = 0;
                 accumulate = 0.0;
+            } else if (command.equals("requestService") && target.equals("autofocus") && action.equals("AutomaticController")){
+                //requestService;autofocus;AutomaticController;None;None
+                publishMessage(Initializer.AUTOFOCUS_APP_TOPIC, Initializer.AUTHENTICATE_AUTOFOCUS_ACTIVITY_MESSAGE);
             } else{
                 Log.i(TAG_M, command + ";" + action);
             }
