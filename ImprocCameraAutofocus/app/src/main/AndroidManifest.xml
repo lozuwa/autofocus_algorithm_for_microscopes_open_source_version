@@ -29,7 +29,7 @@
     <application
         android:name=".Initializer"
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/ic_gradient_black_24dp"
         android:label="AutofocusCameraApp"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"

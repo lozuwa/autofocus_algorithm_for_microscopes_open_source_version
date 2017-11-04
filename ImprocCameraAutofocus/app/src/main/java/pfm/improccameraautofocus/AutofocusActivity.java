@@ -18,6 +18,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.WindowManager;
@@ -60,6 +61,12 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
     public Boolean getVariance;
     public int counterAutofocus = 0;
     public Double accumulate = 0.0;
+
+    /**
+     * Permission statements
+     * */
+    public int PERMISSION_WRITE_EXTERNAL_STORAGE = 1;
+    public int PERMISSION_CAMERA = 2;
 
     /** Load the opencv module (automatic request to playstore if not installed) */
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
@@ -105,6 +112,9 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, 1);
             }
         }
+
+        grantPermissionCamera();
+        grantPermissionExternalStorage();
 
         /** Initialize variables */
         getVariance = false;
@@ -347,5 +357,54 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
     }
 
     /**************************************************************************************************************/
+
+    /**
+     * Support functions
+     * */
+
+    /**
+     * Grants permission to WRITE_EXTERNAL_STORAGE
+     * */
+    public void grantPermissionExternalStorage(){
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+            } else {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_WRITE_EXTERNAL_STORAGE);
+            }
+        }
+    }
+
+    /**
+     * Grants permission to CAMERA
+     * */
+    public void grantPermissionCamera(){
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA)) {
+            } else {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, PERMISSION_CAMERA);
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case 1: {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    showToast("Write external permission granted");
+                } else {
+                }
+                return;
+            }
+            case 2: {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    showToast("Camera permission granted");
+                } else {
+                }
+                return;
+            }
+        }
+    }
 
 }
