@@ -278,7 +278,6 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
             String action = messages[2];
             String specific = messages[3];
             String message = messages[4];
-            //command;target;action;specific;message
             /** Actions based on the income messages */
             if (command.equals("service") && target.equals("autofocus") && action.equals("completed")){
                 if (specific.equals("ManualControllerAndCamera")){
