@@ -27,7 +27,7 @@ public class Initializer extends Application {
     /**
      * MQTT Topics
      * */
-    static public String PREFIX = "/40X/1";
+    static public String PREFIX = "/40X/2";
     static public String MICROSCOPE_TOPIC = "/microscope" + PREFIX;
     static public String CAMERA_APP_TOPIC = "/cameraApp" + PREFIX;
     static public String AUTOFOCUS_APP_TOPIC = "/autofocusApp" + PREFIX;

@@ -38,6 +38,8 @@ import org.opencv.core.MatOfDouble;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.UnsupportedEncodingException;
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
 
 public class AutofocusActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
 
@@ -47,6 +49,9 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
 
     /** Init camera bridge (remember opencv uses camera1 api) */
     private CameraBridgeViewBase mOpenCvCameraView;
+
+    /** Decimal formatter */
+    public DecimalFormat df;
 
     /** Tensor containers (avoid calling them on the method onFrame, otherwise processing becomes really slow )*/
     private Mat mRgba;
@@ -115,6 +120,10 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
 
         grantPermissionCamera();
         grantPermissionExternalStorage();
+
+        /** Initialize classes */
+        df = new DecimalFormat("##.##");
+        df.setRoundingMode(RoundingMode.DOWN);
 
         /** Initialize variables */
         getVariance = false;
@@ -223,7 +232,8 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
             }
             else {
                 if (counterAutofocus == 3){
-                    publishMessage(Initializer.AUTOFOCUS_APP_TOPIC, "send;variance;None;None;" + String.valueOf(accumulate/3.0));
+                    Double sendValueVariance = Double.valueOf(df.format(accumulate/3.0));
+                    publishMessage(Initializer.AUTOFOCUS_APP_TOPIC, "send;variance;None;None;" + String.valueOf(sendValueVariance));
                     getVariance = false;
                 }
                 else{
@@ -236,6 +246,10 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
             //nothing()
         }
         return aux;
+    }
+
+    public Mat convolveWithFilter(Mat image){
+
     }
     /**********************************************************************************************************/
 
