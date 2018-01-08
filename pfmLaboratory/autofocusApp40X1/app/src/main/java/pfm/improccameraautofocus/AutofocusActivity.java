@@ -16,6 +16,7 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -35,11 +36,21 @@ import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfDouble;
+import org.opencv.core.MatOfFloat;
+import org.opencv.core.MatOfInt;
+import org.opencv.core.Point;
+import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
+import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
+import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class AutofocusActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
 
@@ -61,11 +72,24 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
     /** Variables */
     public Double variance;
     public Boolean broker_bool;
+    Double varianceq0 = 0.0;
+    Double varianceq1 = 0.0;
+    Double varianceq2 = 0.0;
+    Double varianceq3 = 0.0;
+
+    public Rect roi0;
+    public Rect roi1;
+    public Rect roi2;
+    public Rect roi3;
 
     /** Variables for autofocus */
     public Boolean getVariance;
     public int counterAutofocus = 0;
     public Double accumulate = 0.0;
+    public Double accumulateq0 = 0.0;
+    public Double accumulateq1 = 0.0;
+    public Double accumulateq2 = 0.0;
+    public Double accumulateq3 = 0.0;
 
     /**
      * Permission statements
@@ -117,17 +141,23 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, 1);
             }
         }
-
         grantPermissionCamera();
         grantPermissionExternalStorage();
 
         /** Initialize classes */
-        df = new DecimalFormat("##.##");
+        df = new DecimalFormat("##.###");
         df.setRoundingMode(RoundingMode.DOWN);
 
         /** Initialize variables */
         getVariance = false;
         broker_bool = false;
+
+        /** Initialize rect */
+        //Rect roi = new Rect(x, y, width, height);
+        roi0 = new Rect(new Point(180 ,70), new Point(360, 240));
+        roi1 = new Rect(new Point(360 ,70), new Point(540, 240));
+        roi2 = new Rect(new Point(180 ,240), new Point(360, 410));
+        roi3 = new Rect(new Point(360 ,240), new Point(540, 410));
 
         /** Open the bridge with the camera interface and configure params
          * setVisibility -> True
@@ -137,7 +167,7 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.tutorial1_activity_java_surface_view);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(this);
-        //mOpenCvCameraView.setMaxFrameSize(1920, 1280);
+        mOpenCvCameraView.setMaxFrameSize(4200, 4200);
     }
 
     /************************************Class callbacks********************************************/
@@ -210,34 +240,60 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
 
     /** Callback for camera */
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
+        /** Variables */
+        //List<Double> quadrantProcessedValues = new ArrayList<Double>();
         /** Get input frame and convert to grayscale */
         aux = inputFrame.rgba();
         mGray = inputFrame.gray();
-        /** Apply high pass filter to obtain high frequencies */
-        Imgproc.Laplacian(mGray, mGray, CvType.CV_8U, 3, 1, 0);
-        /** Convert image to 8 bit depth and one channel */
-        mGray.convertTo(mRgba, CvType.CV_8U);
+        /** Feedback */
+        //Log.i("SIZE IMAGE::", String.valueOf(aux.rows()) + "," + String.valueOf(aux.cols()));
         /**If the start autofocus sequence is activated, process the variance of the laplace filtered image
          * The variance coefficient tells us whether the image is in focus or not.
          * */
         if (getVariance) {
-            /** Laplacian variance feature */
-            MatOfDouble mu = new MatOfDouble();
-            MatOfDouble std = new MatOfDouble();
-            Core.meanStdDev(mRgba, mu, std);
-            variance = Math.pow(mu.get(0,0)[0], 2);
-            Log.i(TAG_M, String.valueOf(variance));
+            /*** Split image into four regions */
+            Mat quadrant0 = mGray.submat(roi0);
+            Mat quadrant1 = mGray.submat(roi1);
+            Mat quadrant2 = mGray.submat(roi2);
+            Mat quadrant3 = mGray.submat(roi3);
+            Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q0.jpg", quadrant0);
+            Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q1.jpg", quadrant1);
+            Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q2.jpg", quadrant2);
+            Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q3.jpg", quadrant3);
+            /*** Convolve each region with a HPF */
+            varianceq0 = extractFeature(quadrant0);
+            varianceq1 = extractFeature(quadrant1);
+            varianceq2 = extractFeature(quadrant2);
+            varianceq3 = extractFeature(quadrant3);
+            /** Get the variance of the complete image */
+            variance = extractFeature(mGray);
+            /** Feedback */
+            Log.i(TAG_M, String.valueOf(variance) + "," + String.valueOf(varianceq0) + "," + String.valueOf(varianceq1) + "," + String.valueOf(varianceq2) + "," + String.valueOf(varianceq3));
+            /** If we have a weird value, then ignore it */
             if (variance < 2.0) {
                 Log.i(TAG_M, "Not a good value: " + String.valueOf(variance));
             }
             else {
-                if (counterAutofocus == 3){
-                    Double sendValueVariance = Double.valueOf(df.format(accumulate/3.0));
-                    publishMessage(Initializer.AUTOFOCUS_APP_TOPIC, "send;variance;None;None;" + String.valueOf(sendValueVariance));
+                /** Let's average the variance in order to get a better estimate */
+                if (counterAutofocus == 3) {
+                    accumulate = Double.valueOf(df.format(accumulate /= 3.0));
+                    accumulateq0 = Double.valueOf(df.format(accumulateq0 /= 3.0));
+                    accumulateq1 = Double.valueOf(df.format(accumulateq1 /= 3.0));
+                    accumulateq2 = Double.valueOf(df.format(accumulateq2 /= 3.0));
+                    accumulateq3 = Double.valueOf(df.format(accumulateq3 /= 3.0));
+                    String valuesVariance = String.valueOf(accumulate) + "," + String.valueOf(accumulateq0) + "," + String.valueOf(accumulateq1) + "," + String.valueOf(accumulateq2) + "," + String.valueOf(accumulateq3);
+                    publishMessage(Initializer.AUTOFOCUS_APP_TOPIC, "send;variance;None;None;" + valuesVariance);
                     getVariance = false;
                 }
-                else{
+                else {
+                    /** Accumulate complete image */
                     accumulate += variance;
+                    /** Accumulate for the quadrants */
+                    accumulateq0 += varianceq0;
+                    accumulateq1 += varianceq1;
+                    accumulateq2 += varianceq2;
+                    accumulateq3 += varianceq3;
+                    /** Increase counter */
                     counterAutofocus++;
                 }
             }
@@ -248,8 +304,48 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
         return aux;
     }
 
-    public Mat convolveWithFilter(Mat image){
+    /**
+     * Convolve the input image with a HPF, give it format and then
+     * compute the variance of the final signal.
+     * @param inputImage: input Mat image
+     * @return feature_: a double value that contains the variance
+     *                   of the processed image.
+     * */
+    public Double extractFeature(Mat inputImage){
+        /** Variables */
+        MatOfDouble mu = new MatOfDouble();
+        MatOfDouble std = new MatOfDouble();
+        /** Extract high frequency signals */
+        Imgproc.Laplacian(inputImage, inputImage, CvType.CV_8U, 3, 1, 0);
+        /** Give format to the image */
+        inputImage.convertTo(inputImage, CvType.CV_8U);
+        /** Compute variance */
+        Core.meanStdDev(inputImage, mu, std);
+        Double feature_ = Math.pow(mu.get(0,0)[0], 2);
+        /** Return value */
+        return feature_;
+    }
 
+    public Double calculateHistogram(Mat inputImage){
+        // Set the amount of bars in the histogram.
+        int histSize = 256;
+        MatOfInt histogramSize = new MatOfInt(histSize);
+
+        // Set the value range.
+        MatOfFloat histogramRange = new MatOfFloat(0f, 256f);
+
+        // Create two separate lists: one for colors and one for channels (these will be used as separate datasets).
+        Scalar[] colorsRgb = new Scalar[]{new Scalar(200, 0, 0, 255), new Scalar(0, 200, 0, 255), new Scalar(0, 0, 200, 255)};
+        MatOfInt[] channels = new MatOfInt[]{new MatOfInt(0), new MatOfInt(1), new MatOfInt(2)};
+
+        // Create an array to be saved in the histogram and a second array, on which the histogram chart will be drawn.
+        //Mat[] histograms = new Mat[]{new Mat(), new Mat(), new Mat()};
+        Mat histograms = new Mat();
+
+        /** Calculate histogram */
+        Imgproc.calcHist(Collections.singletonList(inputImage), channels[0], new Mat(), histograms, histogramSize, histogramRange);
+
+        return 5.0;
     }
     /**********************************************************************************************************/
 

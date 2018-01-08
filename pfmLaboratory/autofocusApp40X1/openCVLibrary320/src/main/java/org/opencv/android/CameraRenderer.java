@@ -105,13 +105,10 @@ public class CameraRenderer extends CameraGLRendererBase {
         List<String> FocusModes = params.getSupportedFocusModes();
         if (FocusModes != null && FocusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO))
         {
-
             //params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
             params.setFocusMode(Camera.Parameters.FOCUS_MODE_INFINITY);
-
         }
         mCamera.setParameters(params);
-
         try {
             mCamera.setPreviewTexture(mSTexture);
         } catch (IOException ioe) {
@@ -137,7 +134,7 @@ public class CameraRenderer extends CameraGLRendererBase {
             float aspect = (float)width / height;
             for (Size size : psize) {
                 int w = size.width, h = size.height;
-                Log.d(LOGTAG, "checking camera preview size: "+w+"x"+h);
+                Log.e("PREVIEW:SIZE:: ", "checking camera preview size: "+w+"x"+h);
                 if ( w <= width && h <= height &&
                      w >= bestWidth && h >= bestHeight &&
                      Math.abs(aspect - (float)w/h) < 0.2 ) {
@@ -160,6 +157,7 @@ public class CameraRenderer extends CameraGLRendererBase {
             mCameraWidth  = bestWidth;
             mCameraHeight = bestHeight;
             param.setPreviewSize(bestWidth, bestHeight);
+            //param.setPreviewSize(4130, 3500);
         }
         param.set("orientation", "landscape");
         mCamera.setParameters(param);
