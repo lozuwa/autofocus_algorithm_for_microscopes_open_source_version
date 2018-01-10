@@ -56,40 +56,47 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.tensorflow.Operation;
-import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
-
-public class AutofocusActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
-    /** Constants */
+public class AutofocusActivity extends Activity
+        implements CameraBridgeViewBase.CvCameraViewListener2 {
+    /**
+     * Constants
+     * */
     private static final String TAG_O = "Opencv::Activity";
     private static final String TAG_M = "MQTT::Activity";
     private static final String TAG_T = "Tensorflow::Activity";
 
-    /** Init camera bridge (remember opencv uses camera1 api) */
+    /**
+     * Init camera bridge (remember opencv uses camera1 api)
+     * */
     private CameraBridgeViewBase mOpenCvCameraView;
 
-    /** Decimal formatter */
+    /**
+     * Decimal formatter
+     * */
     public DecimalFormat df;
 
-    /** Tensor containers (avoid calling them on the method onFrame, otherwise processing becomes really slow )*/
+    /**
+     * Tensor containers (avoid calling them on the method onFrame, otherwise processing becomes
+     * really slow )
+     * */
     private Mat mRgba;
     private Mat aux;
     private Mat mGray;
 
-    /** Variables */
+    /**
+     * Variables autofocus
+     * */
     public Double variance;
-    public Boolean broker_bool;
-    Double varianceq0 = 0.0;
-    Double varianceq1 = 0.0;
-    Double varianceq2 = 0.0;
-    Double varianceq3 = 0.0;
+    public Double varianceq0 = 0.0;
+    public Double varianceq1 = 0.0;
+    public Double varianceq2 = 0.0;
+    public Double varianceq3 = 0.0;
 
     public Rect roi0;
     public Rect roi1;
     public Rect roi2;
     public Rect roi3;
 
-    /** Variables for autofocus */
     public Boolean getVariance;
     public int counterAutofocus = 0;
     public Double accumulate = 0.0;
@@ -98,7 +105,16 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
     public Double accumulateq2 = 0.0;
     public Double accumulateq3 = 0.0;
 
-    /** Variables tensorflow model */
+    public boolean activateq0;
+    public boolean activateq1;
+    public boolean activateq2;
+    public boolean activateq3;
+
+    /**
+     * Variables tensorflow models
+     * */
+    public Boolean classifyPatches;
+
     private Classifier classifier;
 
     private static final int INPUT_SIZE = 128;
@@ -110,18 +126,15 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
     private static final String MODEL_FILE = "file:///android_asset/output_graph.pb";
     private static final String LABEL_FILE = "file:///android_asset/output_labels.txt";
 
-    private Bitmap croppedBitmaproi0 = null;
-    private Bitmap croppedBitmaproi1 = null;
-    private Bitmap croppedBitmaproi2 = null;
-    private Bitmap croppedBitmaproi3 = null;
-
     /**
      * Permission statements
      * */
     public int PERMISSION_WRITE_EXTERNAL_STORAGE = 1;
     public int PERMISSION_CAMERA = 2;
 
-    /** Load the opencv module (automatic request to playstore if not installed) */
+    /**
+     * Load the opencv module (automatic request to playstore if not installed)
+     * */
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -139,36 +152,52 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
         }
     };
 
-    /** Info */
+    /**
+     * Info
+     * */
     public AutofocusActivity() {
         Log.i(TAG_O, "Instantiated new " + this.getClass());
     }
 
-    /** Called when the activity is first created. */
+    /**
+     * Called when the activity is first created.
+     * */
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        /** Display some info */
+        /**
+         * Display some info
+         * */
         Log.i(TAG_O, "called onCreate");
 
-        /** Fix orientation to portrait and keep screen on */
+        /**
+         * Fix orientation to portrait and keep screen on
+         * */
         setRequestedOrientation (ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-        /** Set content to the xml activity_camera_and_controller */
+        /**
+         * Set content to the xml activity_camera_and_controller
+         * */
         setContentView(R.layout.activity_autofocus);
 
-        /** Permissions */
+        /**
+         * Permissions
+         * */
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, 1);
+            if (checkSelfPermission(Manifest.permission.CAMERA) !=
+                                        PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.CAMERA}, 1);
             }
         }
         grantPermissionCamera();
         grantPermissionExternalStorage();
 
-        /** Create tensorflow model */
+        /**
+         * Create tensorflow model
+         * */
         classifier = TensorFlowImageClassifier.create(getAssets(),
                                                         MODEL_FILE,
                                                         LABEL_FILE,
@@ -178,27 +207,33 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
                                                         INPUT_NAME,
                                                         OUTPUT_NAME);
 
-        /** Initialize classes */
+        /**
+         * Initialize classes
+         * */
         df = new DecimalFormat("##.###");
         df.setRoundingMode(RoundingMode.DOWN);
 
-        /** Initialize variables */
+        /**
+         * Initialize variables
+         * */
         getVariance = false;
-        broker_bool = false;
+        classifyPatches = false;
 
-        /** Initialize rect */
+        activateq0 = false;
+        activateq1 = false;
+        activateq2 = false;
+        activateq3 = false;
+
         //Rect roi = new Rect(x, y, width, height);
         roi0 = new Rect(new Point(180 ,70), new Point(180+128, 70+128));
         roi1 = new Rect(new Point(360 ,70), new Point(360+128, 70+128));
         roi2 = new Rect(new Point(180 ,240), new Point(180+128, 240+128));
         roi3 = new Rect(new Point(360 ,240), new Point(360+128, 240+128));
 
-        /*
-        roi0 = new Rect(new Point(180 ,70), new Point(360, 240));
+        /*roi0 = new Rect(new Point(180 ,70), new Point(360, 240));
         roi1 = new Rect(new Point(360 ,70), new Point(540, 240));
         roi2 = new Rect(new Point(180 ,240), new Point(360, 410));
-        roi3 = new Rect(new Point(360 ,240), new Point(540, 410));
-        */
+        roi3 = new Rect(new Point(360 ,240), new Point(540, 410));*/
 
         /** Open the bridge with the camera interface and configure params
          * setVisibility -> True
@@ -282,12 +317,53 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
     /** Callback for camera */
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         /** Variables */
-        //List<Double> quadrantProcessedValues = new ArrayList<Double>();
+        //List<Mat> quadrants = new ArrayList<Mat>();
         /** Get input frame and convert to grayscale */
         aux = inputFrame.rgba();
         mGray = inputFrame.gray();
         /** Feedback */
         //Log.i("SIZE IMAGE::", String.valueOf(aux.rows()) + "," + String.valueOf(aux.cols()));
+        /** If get patch classification is required, then classify the given regions */
+        if (classifyPatches){
+            /*** Split image into four regions */
+            Mat quadrant0 = mGray.submat(roi0);
+            Mat quadrant1 = mGray.submat(roi1);
+            Mat quadrant2 = mGray.submat(roi2);
+            Mat quadrant3 = mGray.submat(roi3);
+            /** Save images */
+            Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q0.jpg", quadrant0);
+            Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q1.jpg", quadrant1);
+            Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q2.jpg", quadrant2);
+            Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q3.jpg", quadrant3);
+            /** Configuration for decoded file conversion to bitmap */
+            BitmapFactory.Options op = new BitmapFactory.Options();
+            op.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            /** Read sliced patches */
+            Bitmap bMap0 = BitmapFactory.decodeFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q0.jpg", op);
+            Bitmap bMap1 = BitmapFactory.decodeFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q1.jpg", op);
+            Bitmap bMap2 = BitmapFactory.decodeFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q2.jpg", op);
+            Bitmap bMap3 = BitmapFactory.decodeFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q3.jpg", op);
+            /** Classify patches */
+            final List<Classifier.Recognition> resultsroi0 = classifier.recognizeImage(bMap0);
+            final List<Classifier.Recognition> resultsroi1 = classifier.recognizeImage(bMap1);
+            final List<Classifier.Recognition> resultsroi2 = classifier.recognizeImage(bMap2);
+            final List<Classifier.Recognition> resultsroi3 = classifier.recognizeImage(bMap3);
+            /** Compute classification results */
+            activateq0 = computeResult(resultsroi0);
+            activateq1 = computeResult(resultsroi1);
+            activateq2 = computeResult(resultsroi2);
+            activateq3 = computeResult(resultsroi3);
+            /** Feedback */
+            Log.i(TAG_T, "Results0: " + resultsroi0.get(0).getTitle() + ", " + String.valueOf(resultsroi0.get(0).getConfidence()) + ", result: " + String.valueOf(activateq0));
+            Log.i(TAG_T, "Results1: " + resultsroi1.get(0).getTitle() + ", " + String.valueOf(resultsroi1.get(0).getConfidence()) + ", result: " + String.valueOf(activateq1));
+            Log.i(TAG_T, "Results2: " + resultsroi2.get(0).getTitle() + ", " + String.valueOf(resultsroi2.get(0).getConfidence()) + ", result: " + String.valueOf(activateq2));
+            Log.i(TAG_T, "Results3: " + resultsroi3.get(0).getTitle() + ", " + String.valueOf(resultsroi3.get(0).getConfidence()) + ", result: " + String.valueOf(activateq3));
+            /** Restart variable */
+            classifyPatches = false;
+        }
+        else {
+            // pass
+        }
         /**If the start autofocus sequence is activated, process the variance of the laplace filtered image
          * The variance coefficient tells us whether the image is in focus or not.
          * */
@@ -297,35 +373,38 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
             Mat quadrant1 = mGray.submat(roi1);
             Mat quadrant2 = mGray.submat(roi2);
             Mat quadrant3 = mGray.submat(roi3);
-            Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q0.jpg", quadrant0);
-            Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q1.jpg", quadrant1);
-            Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q2.jpg", quadrant2);
-            Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q3.jpg", quadrant3);
-            croppedBitmaproi0 = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888);
-            croppedBitmaproi1 = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888);
-            croppedBitmaproi2 = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888);
-            croppedBitmaproi3 = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888);
-            Bitmap bMap0 = BitmapFactory.decodeFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q0.jpg");
-            Bitmap bMap1 = BitmapFactory.decodeFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q1.jpg");
-            Bitmap bMap2 = BitmapFactory.decodeFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q2.jpg");
-            Bitmap bMap3 = BitmapFactory.decodeFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q3.jpg");
-            final List<Classifier.Recognition> resultsroi0 = classifier.recognizeImage(bMap0);
-            final List<Classifier.Recognition> resultsroi1 = classifier.recognizeImage(bMap1);
-            final List<Classifier.Recognition> resultsroi2 = classifier.recognizeImage(bMap2);
-            final List<Classifier.Recognition> resultsroi3 = classifier.recognizeImage(bMap3);
-            Log.i(TAG_T, "Results0: " + resultsroi0.get(0).getTitle() + ", " + String.valueOf(resultsroi0.get(0).getConfidence()));
-            Log.i(TAG_T, "Results1: " + resultsroi1.get(0).getTitle() + ", " + String.valueOf(resultsroi1.get(0).getConfidence()));
-            Log.i(TAG_T, "Results2: " + resultsroi2.get(0).getTitle() + ", " + String.valueOf(resultsroi2.get(0).getConfidence()));
-            Log.i(TAG_T, "Results3: " + resultsroi3.get(0).getTitle() + ", " + String.valueOf(resultsroi3.get(0).getConfidence()));
-            /*** Convolve each region with a HPF */
-            varianceq0 = extractFeature(quadrant0);
-            varianceq1 = extractFeature(quadrant1);
-            varianceq2 = extractFeature(quadrant2);
-            varianceq3 = extractFeature(quadrant3);
+            /** Convolve each region with a HPF
+             * Decide to compute */
+            if (activateq0){
+                varianceq0 = extractFeature(quadrant0);
+            }
+            else {
+                varianceq0 = 0.0;
+            }
+            if (activateq1){
+                varianceq1 = extractFeature(quadrant1);
+            }
+            else {
+                varianceq1 = 0.0;
+            }
+            if (activateq2){
+                varianceq2 = extractFeature(quadrant2);
+            }
+            else {
+                varianceq2 = 0.0;
+            }
+            if (activateq3){
+                varianceq3 = extractFeature(quadrant3);
+            }
+            else {
+                varianceq3 = 0.0;
+            }
             /** Get the variance of the complete image */
             variance = extractFeature(mGray);
             /** Feedback */
-            Log.i(TAG_M, String.valueOf(variance) + "," + String.valueOf(varianceq0) + "," + String.valueOf(varianceq1) + "," + String.valueOf(varianceq2) + "," + String.valueOf(varianceq3));
+            Log.i(TAG_M, String.valueOf(variance) + "," + String.valueOf(varianceq0) + "," +
+                    String.valueOf(varianceq1) + "," + String.valueOf(varianceq2) + "," +
+                    String.valueOf(varianceq3));
             /** If we have a weird value, then ignore it */
             if (variance < 2.0) {
                 Log.i(TAG_M, "Not a good value: " + String.valueOf(variance));
@@ -338,8 +417,13 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
                     accumulateq1 = Double.valueOf(df.format(accumulateq1 /= 3.0));
                     accumulateq2 = Double.valueOf(df.format(accumulateq2 /= 3.0));
                     accumulateq3 = Double.valueOf(df.format(accumulateq3 /= 3.0));
-                    String valuesVariance = String.valueOf(accumulate) + "," + String.valueOf(accumulateq0) + "," + String.valueOf(accumulateq1) + "," + String.valueOf(accumulateq2) + "," + String.valueOf(accumulateq3);
-                    publishMessage(Initializer.AUTOFOCUS_APP_TOPIC, "send;variance;None;None;" + valuesVariance);
+                    String valuesVariance = String.valueOf(accumulate) + "," +
+                                            String.valueOf(accumulateq0) + "," +
+                                            String.valueOf(accumulateq1) + "," +
+                                            String.valueOf(accumulateq2) + "," +
+                                            String.valueOf(accumulateq3);
+                    publishMessage(Initializer.AUTOFOCUS_APP_TOPIC,
+                                    "send;variance;None;None;" + valuesVariance);
                     getVariance = false;
                 }
                 else {
@@ -383,27 +467,6 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
         return feature_;
     }
 
-    public Double calculateHistogram(Mat inputImage){
-        // Set the amount of bars in the histogram.
-        int histSize = 256;
-        MatOfInt histogramSize = new MatOfInt(histSize);
-
-        // Set the value range.
-        MatOfFloat histogramRange = new MatOfFloat(0f, 256f);
-
-        // Create two separate lists: one for colors and one for channels (these will be used as separate datasets).
-        Scalar[] colorsRgb = new Scalar[]{new Scalar(200, 0, 0, 255), new Scalar(0, 200, 0, 255), new Scalar(0, 0, 200, 255)};
-        MatOfInt[] channels = new MatOfInt[]{new MatOfInt(0), new MatOfInt(1), new MatOfInt(2)};
-
-        // Create an array to be saved in the histogram and a second array, on which the histogram chart will be drawn.
-        //Mat[] histograms = new Mat[]{new Mat(), new Mat(), new Mat()};
-        Mat histograms = new Mat();
-
-        /** Calculate histogram */
-        Imgproc.calcHist(Collections.singletonList(inputImage), channels[0], new Mat(), histograms, histogramSize, histogramRange);
-
-        return 5.0;
-    }
     /**********************************************************************************************************/
 
     /***********************************************MQTT***********************************************************/
@@ -460,6 +523,9 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
                 } else{
                     //nothing
                 }
+            } else if (command.equals("classify") && target.equals("patches")){
+                /** Set booleans to activate patch classification */
+                classifyPatches = true;
             } else if (command.equals("get") && target.equals("variance")) {
                 /** Set variables to starting point */
                 getVariance = true;
@@ -492,7 +558,7 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
     };
     /**************************************************************************************************************/
 
-    /*****************************************SUPPORT classes*******************************************************/
+    /*****************************************Support methods*******************************************************/
     /** Publish a message
      * @param topic: input String that defines the target topic of the mqtt client
      * @param message: input String that contains a message to be published
@@ -509,6 +575,21 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
         }
     }
 
+    /** Compute classification */
+    public boolean computeResult(List <Classifier.Recognition> result){
+        double confidencehdb = 0;
+        double confidenceldb = 0;
+        if (result.get(0).getTitle().equals("hdb")){
+            confidencehdb = result.get(0).getConfidence();
+            confidenceldb = 1 - confidencehdb;
+        }
+        else{
+            confidenceldb = result.get(0).getConfidence();
+            confidencehdb = 1 - confidenceldb;
+        }
+        return confidencehdb >= confidenceldb? false: true;
+    }
+
     /** Support class to display information */
     public void showToast(String message){
         /** Show toast easily
@@ -521,12 +602,6 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
             Toast.makeText(AutofocusActivity.this, "Unable to show toast: " + ex.toString(), Toast.LENGTH_SHORT).show();
         }
     }
-
-    /**************************************************************************************************************/
-
-    /**
-     * Support functions
-     * */
 
     /**
      * Grants permission to WRITE_EXTERNAL_STORAGE
