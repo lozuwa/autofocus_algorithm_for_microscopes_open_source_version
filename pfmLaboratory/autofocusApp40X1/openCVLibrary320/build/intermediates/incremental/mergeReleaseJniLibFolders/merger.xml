@@ -1,2 +1,2 @@
 <?xml version="1.0" encoding="utf-8"?>
-<merger version="3"><dataSet config="main"><source path="C:\Users\HP\Dropbox\pfm\Apps\autofocus_app\pfmLaboratory\autofocusApp40X1\openCVLibrary320\src\main\jniLibs"/></dataSet><dataSet config="release"><source path="C:\Users\HP\Dropbox\pfm\Apps\autofocus_app\pfmLaboratory\autofocusApp40X1\openCVLibrary320\src\release\jniLibs"/></dataSet></merger>
+<merger version="3"><dataSet config="main"><source path="/home/pfm/Documents/pfm/apps/autofocus_app/pfmLaboratory/autofocusApp40X1/openCVLibrary320/src/main/jniLibs"/></dataSet><dataSet config="release"><source path="/home/pfm/Documents/pfm/apps/autofocus_app/pfmLaboratory/autofocusApp40X1/openCVLibrary320/src/release/jniLibs"/></dataSet></merger>

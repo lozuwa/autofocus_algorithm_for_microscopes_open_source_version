@@ -14,6 +14,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -43,6 +46,7 @@ import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
+import java.util.logging.Logger;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -52,11 +56,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class AutofocusActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
+import org.tensorflow.Operation;
+import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 
+public class AutofocusActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
     /** Constants */
     private static final String TAG_O = "Opencv::Activity";
     private static final String TAG_M = "MQTT::Activity";
+    private static final String TAG_T = "Tensorflow::Activity";
 
     /** Init camera bridge (remember opencv uses camera1 api) */
     private CameraBridgeViewBase mOpenCvCameraView;
@@ -90,6 +97,23 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
     public Double accumulateq1 = 0.0;
     public Double accumulateq2 = 0.0;
     public Double accumulateq3 = 0.0;
+
+    /** Variables tensorflow model */
+    private Classifier classifier;
+
+    private static final int INPUT_SIZE = 128;
+    private static final int IMAGE_MEAN = 128;
+    private static final float IMAGE_STD = 128;
+    private static final String INPUT_NAME = "input";
+    private static final String OUTPUT_NAME = "final_result";
+
+    private static final String MODEL_FILE = "file:///android_asset/output_graph.pb";
+    private static final String LABEL_FILE = "file:///android_asset/output_labels.txt";
+
+    private Bitmap croppedBitmaproi0 = null;
+    private Bitmap croppedBitmaproi1 = null;
+    private Bitmap croppedBitmaproi2 = null;
+    private Bitmap croppedBitmaproi3 = null;
 
     /**
      * Permission statements
@@ -144,6 +168,16 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
         grantPermissionCamera();
         grantPermissionExternalStorage();
 
+        /** Create tensorflow model */
+        classifier = TensorFlowImageClassifier.create(getAssets(),
+                                                        MODEL_FILE,
+                                                        LABEL_FILE,
+                                                        INPUT_SIZE,
+                                                        IMAGE_MEAN,
+                                                        IMAGE_STD,
+                                                        INPUT_NAME,
+                                                        OUTPUT_NAME);
+
         /** Initialize classes */
         df = new DecimalFormat("##.###");
         df.setRoundingMode(RoundingMode.DOWN);
@@ -154,10 +188,17 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
 
         /** Initialize rect */
         //Rect roi = new Rect(x, y, width, height);
+        roi0 = new Rect(new Point(180 ,70), new Point(180+128, 70+128));
+        roi1 = new Rect(new Point(360 ,70), new Point(360+128, 70+128));
+        roi2 = new Rect(new Point(180 ,240), new Point(180+128, 240+128));
+        roi3 = new Rect(new Point(360 ,240), new Point(360+128, 240+128));
+
+        /*
         roi0 = new Rect(new Point(180 ,70), new Point(360, 240));
         roi1 = new Rect(new Point(360 ,70), new Point(540, 240));
         roi2 = new Rect(new Point(180 ,240), new Point(360, 410));
         roi3 = new Rect(new Point(360 ,240), new Point(540, 410));
+        */
 
         /** Open the bridge with the camera interface and configure params
          * setVisibility -> True
@@ -167,7 +208,7 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.tutorial1_activity_java_surface_view);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(this);
-        mOpenCvCameraView.setMaxFrameSize(4200, 4200);
+        //mOpenCvCameraView.setMaxFrameSize(4200, 4200);
     }
 
     /************************************Class callbacks********************************************/
@@ -260,6 +301,22 @@ public class AutofocusActivity extends Activity implements CameraBridgeViewBase.
             Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q1.jpg", quadrant1);
             Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q2.jpg", quadrant2);
             Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q3.jpg", quadrant3);
+            croppedBitmaproi0 = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888);
+            croppedBitmaproi1 = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888);
+            croppedBitmaproi2 = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888);
+            croppedBitmaproi3 = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888);
+            Bitmap bMap0 = BitmapFactory.decodeFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q0.jpg");
+            Bitmap bMap1 = BitmapFactory.decodeFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q1.jpg");
+            Bitmap bMap2 = BitmapFactory.decodeFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q2.jpg");
+            Bitmap bMap3 = BitmapFactory.decodeFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM) + File.separator + "q3.jpg");
+            final List<Classifier.Recognition> resultsroi0 = classifier.recognizeImage(bMap0);
+            final List<Classifier.Recognition> resultsroi1 = classifier.recognizeImage(bMap1);
+            final List<Classifier.Recognition> resultsroi2 = classifier.recognizeImage(bMap2);
+            final List<Classifier.Recognition> resultsroi3 = classifier.recognizeImage(bMap3);
+            Log.i(TAG_T, "Results0: " + resultsroi0.get(0).getTitle() + ", " + String.valueOf(resultsroi0.get(0).getConfidence()));
+            Log.i(TAG_T, "Results1: " + resultsroi1.get(0).getTitle() + ", " + String.valueOf(resultsroi1.get(0).getConfidence()));
+            Log.i(TAG_T, "Results2: " + resultsroi2.get(0).getTitle() + ", " + String.valueOf(resultsroi2.get(0).getConfidence()));
+            Log.i(TAG_T, "Results3: " + resultsroi3.get(0).getTitle() + ", " + String.valueOf(resultsroi3.get(0).getConfidence()));
             /*** Convolve each region with a HPF */
             varianceq0 = extractFeature(quadrant0);
             varianceq1 = extractFeature(quadrant1);
