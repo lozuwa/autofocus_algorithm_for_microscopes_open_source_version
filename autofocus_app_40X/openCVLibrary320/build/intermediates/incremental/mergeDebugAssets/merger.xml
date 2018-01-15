@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merger version="3"><dataSet config="main"><source path="/home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X_1/openCVLibrary320/src/main/assets"/><source path="/home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X_1/openCVLibrary320/build/generated/assets/shaders/debug"/></dataSet><dataSet config="debug"><source path="/home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X_1/openCVLibrary320/src/debug/assets"/></dataSet></merger>

@@ -1,0 +1,41 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:2:1-9:12
+INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:2:1-9:12
+INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:2:1-9:12
+INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:2:1-9:12
+INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:2:1-9:12
+INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:2:1-9:12
+INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:2:1-9:12
+	package
+		ADDED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:3:7-27
+		INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml
+		INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml
+	android:versionName
+		ADDED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:5:7-34
+		INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml
+		INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:2:11-69
+	android:versionCode
+		ADDED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:4:7-33
+		INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml
+		INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml
+uses-sdk
+ADDED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:7:5-73
+INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:7:5-73
+INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:7:5-73
+INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:7:5-73
+INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:7:5-73
+	android:targetSdkVersion
+		ADDED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:7:41-70
+		INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml
+		INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		ADDED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:7:15-40
+		INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml
+		INJECTED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml
+uses-permission#android.permission.CAMERA
+ADDED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:8:5-65
+	android:name
+		ADDED from /home/pfm/Documents/pfm/apps/autofocus_app/autofocus_app_40X/openCVLibrary320/src/main/AndroidManifest.xml:8:22-62
