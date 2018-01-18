@@ -105,7 +105,7 @@ public class CameraRenderer extends CameraGLRendererBase {
         List<String> FocusModes = params.getSupportedFocusModes();
         if (FocusModes != null && FocusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO))
         {
-            params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
+            params.setFocusMode(Camera.Parameters.FOCUS_MODE_MACRO);
         }
         mCamera.setParameters(params);
 
